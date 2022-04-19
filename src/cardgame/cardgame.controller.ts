@@ -11,24 +11,24 @@ export class CardgameController {
   }
 
   mappers = [
-    873961,//skystar
-    5129592,//frostwich
-    6411631//maarvin
-    //3827077,//nhlx
-    //15111904,
-    //6063342,
-    //5194391,
-    //5387375,
-    //9331411,
-    //1314547,
-    //4109923,
-    //4673089,
-    //7262065,
-    //4468239,
-    //8617799,
-    //8271086,
-    //14261540,
-    //2123087,
+    //873961,//skystar
+    //5129592,//frostwich
+    //6411631//maarvin
+    3827077,//nhlx
+    15111904,
+    6063342,
+    5194391,
+    5387375,
+    9331411,
+    1314547,
+    4109923,
+    4673089,
+    7262065,
+    4468239,
+    8617799,
+    8271086,
+    14261540,
+    2123087
   ];
 
   @Get("init")
@@ -53,7 +53,7 @@ export class CardgameController {
       cardType.profileId = profile.id;
       await this.cardService.updateCardType(cardType);
 
-      console.log('created card for mapper ' + cardType.name)
+      console.log("created card for mapper " + cardType.name);
 
       if (i >= this.mappers.length)
         clearInterval(interval);

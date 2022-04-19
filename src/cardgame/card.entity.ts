@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryColumn, PrimaryGeneratedColumn } from "typeorm";
 import { CardTypeEntity } from "./cardtype.entity";
 import { MemberEntity } from "../common/member.entity";
 
@@ -13,28 +13,54 @@ export enum CardQuality {
 @Entity()
 export class CardEntity {
 
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryColumn()
+  id: string;
 
-  @ManyToOne(() => CardTypeEntity, {eager: true})
+  @ManyToOne(() => CardTypeEntity, { eager: true })
   cardType: CardTypeEntity;
 
-  @ManyToOne(() => MemberEntity, {eager: true})
+  @ManyToOne(() => MemberEntity, { eager: true })
   droppedBy: MemberEntity;
 
-  @ManyToOne(() => MemberEntity, {eager: true})
+  @ManyToOne(() => MemberEntity, { eager: true })
   owner: MemberEntity;
 
   @Column({ type: "datetime" })
   droppedAt: Date;
 
   @Column({ type: "datetime", nullable: true })
-  claimedAt: Date;
+  claimedAt?: Date;
 
   @Column({ type: "datetime", nullable: true })
-  burnedAt: Date;
+  ownedAt?: Date;
+
+  @Column({ type: "datetime", nullable: true })
+  burnedAt?: Date;
 
   @Column({ type: "int" })
   quality: CardQuality;
+
+  get cardBurnValue() {
+let multiplier;
+switch (this.quality) {
+  case CardQuality.DAMAGED:
+    multiplier = 0.0625;
+    break;
+  case CardQuality.POOR:
+    multiplier = 0.125;
+    break;
+  case CardQuality.GOOD:
+    multiplier = 0.25;
+    break;
+  case CardQuality.GREAT:
+    multiplier = 0.5;
+    break;
+  case CardQuality.MINT:
+    multiplier = 1;
+    break;
+}
+
+    return Math.ceil(40 * multiplier);
+  }
 
 }
