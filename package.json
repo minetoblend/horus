@@ -35,6 +35,7 @@
     "rimraf": "^3.0.2",
     "rxjs": "^7.2.0",
     "sqlite3": "^5.0.4",
+    "superagent": "^7.1.2",
     "typeorm": "^0.3.6",
     "webpack": "^5.72.0"
   },

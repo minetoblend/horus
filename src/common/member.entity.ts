@@ -12,4 +12,7 @@ export class MemberEntity {
   @Column({ type: "datetime", nullable: true })
   collectedDailyAt?: Date;
 
+  @Column({ type: "datetime", nullable: true })
+  lastDropAt?: Date;
+
 }

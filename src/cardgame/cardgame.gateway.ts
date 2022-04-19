@@ -1,10 +1,19 @@
 import { Injectable } from "@nestjs/common";
 import { setupCommands } from "../util/command";
-import { Client, Message, MessageEmbed } from "discord.js";
-import { InjectDiscordClient } from "@discord-nestjs/core";
+import {
+  ButtonInteraction,
+  Client,
+  Message,
+  MessageActionRow,
+  MessageButton,
+  MessageEmbed,
+} from "discord.js";
+import { InjectDiscordClient, On } from "@discord-nestjs/core";
 import { GuildService } from "../common/guid.service";
 import { MemberService } from "../common/member.service";
 import { intervalToDuration, addDays } from "date-fns";
+import { CardService } from "./card.service";
+import { CardQuality } from "./card.entity";
 
 @Injectable()
 export class CardgameGateway {
@@ -13,7 +22,8 @@ export class CardgameGateway {
     @InjectDiscordClient()
     private client: Client,
     private guildService: GuildService,
-    private memberService: MemberService
+    private memberService: MemberService,
+    private cardService: CardService
   ) {
     setupCommands(client, guildService, this, {
       inventory: {
@@ -32,7 +42,11 @@ export class CardgameGateway {
         locked: true,
         handler: "daily"
       },
-      give: "give"
+      give: "give",
+      drop: {
+        locked: true,
+        handler: "drop"
+      }
     });
   }
 
@@ -92,7 +106,6 @@ export class CardgameGateway {
 
     if (member.collectedDailyAt) {
       const duration = intervalToDuration({ start: member.collectedDailyAt, end: new Date() });
-      console.log(duration);
       if (duration.hours < 24) {
         const nextDay = addDays(member.collectedDailyAt, 1);
         const durationUntil = intervalToDuration({ start: new Date(), end: nextDay });
@@ -141,7 +154,7 @@ export class CardgameGateway {
           await this.memberService.update(giver, receiver);
           return message.reply(`Succesfully gave ${amountParsed} gold to ${
             (await message.guild.members.fetch(receiver.id)).toString()
-          }`)
+          }`);
 
         default:
           message.reply("Unknown item " + item);
@@ -150,5 +163,106 @@ export class CardgameGateway {
     });
   }
 
+
+  async drop(message: Message) {
+
+    const member = await this.memberService.getOrCreateFromMember(message.member);
+
+    if (member.lastDropAt) {
+      const duration = Math.floor((new Date().getTime() - member.lastDropAt.getTime()) / 1000);
+
+
+      if (duration < 30 * 60) {
+
+        const durationUntil = Math.floor((30 * 60 - duration));
+        let text;
+        if (durationUntil > 60)
+          text = `${Math.round(durationUntil / 60)} more minutes`;
+        else
+          text = `${durationUntil} more seconds`;
+        return message.reply(`You must wait \`${text}\` before dropping more cards.`);
+      }
+
+    }
+
+    member.lastDropAt = new Date();
+    this.memberService.update(member);
+
+    const drop = await this.cardService.createDrop(member);
+
+    const embed = new MessageEmbed()
+      .setImage(drop.cardType.picture)
+      .setTitle(drop.cardType.name)
+      .setURL(
+        `https://osu.ppy.sh/users/${drop.cardType.profileId}`);
+
+    const actionRow = new MessageActionRow();
+    actionRow.addComponents(new MessageButton()
+      .setStyle("PRIMARY")
+      .setLabel("Grab")
+      .setCustomId("grab_card:" + drop.id)
+    );
+
+    const reply = await message.reply({ embeds: [embed], components: [actionRow] });
+
+    setTimeout(async () => {
+      const card = await this.cardService.getCardById(drop.id);
+      if (card.claimedAt)
+        await reply.edit({
+          components: [],
+          embeds: [embed]
+        });
+      else
+        await reply.edit({
+          content: "*This card can no longer be grabbed.*",
+          components: [],
+          embeds: [embed]
+        });
+    }, 30_000);
+  }
+
+  @On("interactionCreate")
+  async onMessage(interaction: ButtonInteraction) {
+    if (interaction.customId.startsWith("grab_card")) {
+      const member = await this.memberService.getOrCreateFromMember(interaction.user);
+      const [_, id] = interaction.customId.split(":");
+      const drop = await this.cardService.getCardById(parseInt(id));
+
+      if (drop) {
+
+        if (drop.owner) {
+          if (drop.droppedBy.id === interaction.user.id && drop.owner.id !== interaction.user.id) {
+            await this.cardService.claim(member, drop);
+            return interaction.reply("You fought  over the card and came out victoriously.");
+          } else {
+            return interaction.reply("Card was already claimed.");
+          }
+        } else {
+          await this.cardService.claim(member, drop);
+          let condition;
+          switch (drop.quality) {
+            case CardQuality.DAMAGED:
+              condition = "Unfortunately, it is badly damaged.";
+              break;
+            case CardQuality.POOR:
+              condition = "It's condition is quite poor.";
+              break;
+            case CardQuality.GOOD:
+              condition = "It's in good condition.";
+              break;
+            case CardQuality.GREAT:
+              condition = "It is great condition.";
+              break;
+            case CardQuality.MINT:
+              condition = "It is in mint condition.";
+              break;
+          }
+
+          await interaction.reply(`${interaction.user.toString()} took the ${drop.cardType.name} card. ${condition}`);
+        }
+      }
+
+    }
+  }
 
 }
