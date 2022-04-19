@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDiscordClient, On } from "@discord-nestjs/core";
-import { Client, Message } from "discord.js";
+import { Client, GuildChannel, Message } from "discord.js";
 import { GuildService } from "../common/guid.service";
 import { setupCommands } from "../util/command";
 
@@ -19,11 +19,8 @@ export class ConfigGateway {
 
   @On("messageCreate")
   onMessage(message: Message) {
-
-    if (message.content.startsWith("$$setprefix"))
+    if (message.content.startsWith("$$setprefix") && message.member.permissionsIn(message.channelId).has("ADMINISTRATOR"))
       this.setPrefix(message);
-
-
   }
 
   async setPrefix(message: Message) {
@@ -46,10 +43,14 @@ export class ConfigGateway {
   }
 
   async setBotChannel(message: Message) {
+    if (!message.member.permissionsIn(message.channelId).has("ADMINISTRATOR"))
+      return;
     const guild = await this.guildService.getOrCreateFromGuild(message.guild);
     guild.botChannel = message.channel.id;
     await this.guildService.update(guild);
-    message.reply("Successfully set up the bot channel")
+    await message.reply("Successfully set up the bot channel");
   }
+
+
 
 }

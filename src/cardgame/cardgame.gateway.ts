@@ -1,19 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { setupCommands } from "../util/command";
-import {
-  ButtonInteraction,
-  Client,
-  Message,
-  MessageActionRow,
-  MessageButton,
-  MessageEmbed,
-} from "discord.js";
+import { ButtonInteraction, Client, Message, MessageActionRow, MessageButton, MessageEmbed } from "discord.js";
 import { InjectDiscordClient, On } from "@discord-nestjs/core";
 import { GuildService } from "../common/guid.service";
 import { MemberService } from "../common/member.service";
-import { intervalToDuration, addDays } from "date-fns";
+import { addDays, intervalToDuration } from "date-fns";
 import { CardService } from "./card.service";
-import { CardQuality } from "./card.entity";
+import { CardEntity, CardQuality } from "./card.entity";
+import { createPagination } from "../util/pagination";
+import { MemberEntity } from "../common/member.entity";
+import { randomUUID } from "crypto";
+import * as superagent from "superagent";
+import { createCanvas, loadImage } from "canvas";
 
 @Injectable()
 export class CardgameGateway {
@@ -46,6 +44,22 @@ export class CardgameGateway {
       drop: {
         locked: true,
         handler: "drop"
+      },
+      resetDrop: {
+        locked: true,
+        handler: "resetDrop"
+      },
+      view: {
+        locked: true,
+        handler: "view"
+      },
+      collection: {
+        locked: true,
+        handler: "collection"
+      },
+      burn: {
+        locked: true,
+        handler: "burn"
       }
     });
   }
@@ -190,11 +204,11 @@ export class CardgameGateway {
 
     const drop = await this.cardService.createDrop(member);
 
+
     const embed = new MessageEmbed()
-      .setImage(drop.cardType.picture)
+      .setImage("attachment://card.png")
       .setTitle(drop.cardType.name)
-      .setURL(
-        `https://osu.ppy.sh/users/${drop.cardType.profileId}`);
+      .setURL(`https://osu.ppy.sh/users/${drop.cardType.profileId}`);
 
     const actionRow = new MessageActionRow();
     actionRow.addComponents(new MessageButton()
@@ -203,14 +217,22 @@ export class CardgameGateway {
       .setCustomId("grab_card:" + drop.id)
     );
 
-    const reply = await message.reply({ embeds: [embed], components: [actionRow] });
+    const files = [
+      {
+        attachment: await this.getCardImage(drop),
+        name: "card.png"
+      }
+    ];
+
+    const reply = await message.reply({ embeds: [embed], components: [actionRow], files });
 
     setTimeout(async () => {
       const card = await this.cardService.getCardById(drop.id);
       if (card.claimedAt)
         await reply.edit({
           components: [],
-          embeds: [embed]
+          embeds: [embed],
+          files
         });
       else
         await reply.edit({
@@ -221,12 +243,19 @@ export class CardgameGateway {
     }, 30_000);
   }
 
+  async resetDrop(message: Message) {
+    const member = await this.memberService.getOrCreateFromMember(message.member);
+    member.lastDropAt = null;
+    await this.memberService.update(member);
+    await message.reply("done");
+  }
+
   @On("interactionCreate")
   async onMessage(interaction: ButtonInteraction) {
     if (interaction.customId.startsWith("grab_card")) {
       const member = await this.memberService.getOrCreateFromMember(interaction.user);
       const [_, id] = interaction.customId.split(":");
-      const drop = await this.cardService.getCardById(parseInt(id));
+      const drop = await this.cardService.getCardById(id);
 
       if (drop) {
 
@@ -258,11 +287,142 @@ export class CardgameGateway {
               break;
           }
 
-          await interaction.reply(`${interaction.user.toString()} took the ${drop.cardType.name} card. ${condition}`);
+          await interaction.reply(`${interaction.user.toString()} took the ${drop.cardType.name} card \`${drop.id}\`. ${condition}`);
         }
+      }
+    }
+  }
+
+  async view(message: Message, [id]: string[]) {
+    let card: CardEntity | undefined;
+    const member = await this.memberService.getOrCreateFromMember(message.member);
+    if (id) {
+      card = await this.cardService.getCardById(id);
+    } else {
+      card = await this.cardService.getLatestCard(member);
+    }
+
+    if (!card) {
+      message.reply("Could not find card");
+    } else {
+      const image = await this.getCardImage(card);
+
+
+      const embed = new MessageEmbed()
+        .setTitle(card.cardType.name)
+        .setFields({
+          name: "quality", value: CardQuality[card.quality].toLowerCase()!
+        })
+        .setImage("attachment://card.png")
+        .setURL(`https://osu.ppy.sh/users/${card.cardType.profileId}`);
+
+      message.reply({
+        embeds: [embed],
+        files: [
+          {
+            attachment: image,
+            name: "card.png"
+          }
+        ]
+      });
+    }
+  }
+
+  async collection(message: Message) {
+    let member: MemberEntity;
+    if (message.mentions.users.size > 0) {
+      member = await this.memberService.getOrCreateFromMember(message.mentions.users.first());
+    } else {
+      member = await this.memberService.getOrCreateFromMember(message.member);
+    }
+
+    await createPagination(message, async (offset, limit) => {
+      const numCards = await this.cardService.getCardCountByMember(member);
+      const cards = await this.cardService.getCardsByMemberPaginated(member, offset, limit);
+      const embed = new MessageEmbed()
+        .setDescription(`Cards owned by <@${member.id}>.`)
+        .addFields(
+          ...cards.map((card, index) => ({
+            name: `#${offset + index + 1}, ${card.cardType.name}`,
+            value: `\`${card.id}\`, condition: ${CardQuality[card.quality].toLowerCase()}`
+          }))
+        )
+        .setFooter({
+          text: `Showing cards ${offset + 1}-${offset + limit + 1} of ${numCards}`
+        });
+
+      return {
+        embed,
+        total: numCards
+      };
+    });
+  }
+
+  async burn(message: Message, [cardId]: string[]) {
+    let card: CardEntity;
+    const member = await this.memberService.getOrCreateFromMember(message.member);
+    if (cardId) {
+      card = await this.cardService.getCardById(cardId);
+    } else {
+      card = await this.cardService.getLatestCard(member);
+    }
+    if (!card)
+      return message.reply("Unknown card.");
+
+    if (card.owner.id !== member.id)
+      return message.reply("You can only burn your own cards.");
+
+
+    const value = card.cardBurnValue;
+    const embed = new MessageEmbed()
+      .setTitle("Burn Card")
+      .setThumbnail(card.cardType.picture)
+      .setDescription(
+        [
+          `${message.member.toString()} you will receive:`,
+          "",
+          `💰 **${value}**  Gold`
+        ]
+          .join("\n")
+      );
+
+    const actionRow = new MessageActionRow();
+
+    await message.reply({
+      embeds: [embed]
+    });
+  }
+
+  async getCardImage(card: CardEntity): Promise<Buffer> {
+    const canvas = createCanvas(250, 350);
+    const ctx = canvas.getContext("2d");
+    const [overlay, avatar, star, starYellow] = await Promise.all([
+      loadImage("media/card_1.png"),
+      loadImage((await superagent.get(card.cardType.picture)).body as Buffer),
+      loadImage("media/star-solid.svg"),
+      loadImage("media/star-gold.svg")
+
+    ]);
+
+    const path = "tmp/" + randomUUID() + "png";
+    ctx.drawImage(avatar, 12, 12, 225, 225);
+    ctx.drawImage(overlay, 0, 0, 250, 350);
+
+    ctx.fillStyle = "black";
+    ctx.textBaseline = "top";
+    ctx.font = "regular 15pt Arial";
+    ctx.fillText(card.cardType.name, 12, 240);
+    let rating = 2;
+    for (let i = 0; i < 4; i++) {
+      if (i < rating) {
+        ctx.drawImage(starYellow, 168 + i * 20, 3, 18, 18);
+      } else {
+        ctx.drawImage(star, 168 + i * 20, 3, 18, 18);
       }
 
     }
+
+    return canvas.toBuffer("image/png");
   }
 
 }
