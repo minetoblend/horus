@@ -3,7 +3,9 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { GuildEntity } from "./guild.entity";
 import { Repository } from "typeorm";
 import { Guild } from "discord.js";
+
 import * as AsyncLock from "async-lock";
+
 
 const lock = new AsyncLock();
 

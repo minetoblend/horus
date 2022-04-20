@@ -20,17 +20,29 @@ export class CardService {
     return this.cardTypeRepository.save(type);
   }
 
+
   getRandomType() {
+
+    const sql = this.cardTypeRepository.createQueryBuilder()
+      .select()
+      .orderBy("random() * dropChanceMultiplier")
+      .limit(1)
+      .getSql();
+
+    console.log(sql);
+
     return this.cardTypeRepository
       .createQueryBuilder()
       .select()
-      .orderBy("RANDOM()")
+      .orderBy("random() * dropChanceMultiplier")
       .limit(1)
+      .printSql()
       .getOne();
   }
 
-  reset() {
-    return this.cardTypeRepository.clear();
+  async reset() {
+    await this.cardRepository.clear();
+    await this.cardTypeRepository.clear();
   }
 
   async generateCardId(): Promise<string> {
@@ -92,10 +104,10 @@ export class CardService {
 
   async getCardsByMemberPaginated(member: MemberEntity, skip: number, take: number) {
     return this.cardRepository.find({
-      where: {owner: member, burnedAt: IsNull()},
+      where: { owner: member, burnedAt: IsNull() },
       order: { id: "desc" },
       skip,
       take
-    })
+    });
   }
 }

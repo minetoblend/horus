@@ -7,10 +7,11 @@ import { CardTypeEntity } from "./cardtype.entity";
 import { CardgameController } from "./cardgame.controller";
 import { CardService } from "./card.service";
 import { CardEntity } from "./card.entity";
+import { CardRenderer } from "./card.renderer";
 
 @Module({
   imports: [DiscordModule.forFeature(), CommonModule, TypeOrmModule.forFeature([CardTypeEntity, CardEntity])],
-  providers: [CardgameGateway, CardService],
+  providers: [CardgameGateway, CardService, CardRenderer],
   controllers: [CardgameController]
 })
 export class CardgameModule {

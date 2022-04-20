@@ -3,6 +3,8 @@ import { CardTypeEntity } from "./cardtype.entity";
 import { CardService } from "./card.service";
 import { ConfigService } from "@nestjs/config";
 import * as superagent from "superagent";
+import * as FavoritesList from "../../media/favored-mappers.json";
+
 
 @Controller("cardgame")
 export class CardgameController {
@@ -37,29 +39,40 @@ export class CardgameController {
 
     let i = 0;
     const interval = setInterval(async () => {
-      let mapper = this.mappers[i++];
-      if(!mapper) {
-        clearInterval(interval)
+      let mapper = FavoritesList[i++];
+      if (!mapper) {
+        clearInterval(interval);
         return;
       }
 
-      const response = await superagent.get(`https://osu.ppy.sh/api/v2/users/${mapper}`)
-        .set("Authorization", `Bearer ${this.configService.get("OSU_ACCESS_TOKEN")}`);
-      const profile = response.body;
+      try {
+        const response = await superagent.get(`https://osu.ppy.sh/api/v2/users/${mapper.mapperId}`)
+          .set("Authorization", `Bearer ${this.configService.get("OSU_ACCESS_TOKEN")}`);
+        const profile = response.body;
 
+        const numFavorites = Math.round(mapper.count);
 
-      const cardType = new CardTypeEntity();
-      cardType.type = "mapper";
-      cardType.picture = profile.avatar_url;
-      cardType.country = profile.country_url;
-      cardType.name = profile.username;
-      cardType.previousUsernames = (profile.previous_usernames || []).join(", ");
-      cardType.profileId = profile.id;
-      await this.cardService.updateCardType(cardType);
+        const cardType = new CardTypeEntity();
+        cardType.type = "mapper";
+        cardType.picture = profile.avatar_url;
+        cardType.country = profile.country_url;
+        cardType.name = profile.username;
+        cardType.previousUsernames = (profile.previous_usernames || []).join(", ");
+        cardType.profileId = profile.id;
+        cardType.numRankedMaps = profile.ranked_beatmapset_count;
+        cardType.numMappingSubscribers = profile.mapping_follower_count;
+        cardType.followerCount = profile.follower_count;
+        cardType.numFavorites = numFavorites;
+        cardType.calculateDropChanceMultiplier();
 
-      console.log("created card for mapper " + cardType.name);
+        await this.cardService.updateCardType(cardType);
 
-    }, 500);
+        console.log("created card for mapper " + cardType.name);
+      } catch (e) {
+        console.error(`Could not find profile for ${mapper.names[0]}`);
+      }
+
+    }, 100);
 
     return "success";
   }

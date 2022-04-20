@@ -40,27 +40,38 @@ export class CardEntity {
   @Column({ type: "int" })
   quality: CardQuality;
 
-  get cardBurnValue() {
-let multiplier;
-switch (this.quality) {
-  case CardQuality.DAMAGED:
-    multiplier = 0.0625;
-    break;
-  case CardQuality.POOR:
-    multiplier = 0.125;
-    break;
-  case CardQuality.GOOD:
-    multiplier = 0.25;
-    break;
-  case CardQuality.GREAT:
-    multiplier = 0.5;
-    break;
-  case CardQuality.MINT:
-    multiplier = 1;
-    break;
-}
+  get rarityLevel() {
+    if (this.cardType.dropChanceMultiplier < 0.05)
+      return 4;
+    if (this.cardType.dropChanceMultiplier < 0.5)
+      return 3;
+    if (this.cardType.dropChanceMultiplier < 1)
+      return 2;
+    return 1;
+  }
 
-    return Math.ceil(40 * multiplier);
+  get cardBurnValue() {
+    let multiplier;
+    switch (this.quality) {
+      case CardQuality.DAMAGED:
+        multiplier = 0.0625;
+        break;
+      case CardQuality.POOR:
+        multiplier = 0.125;
+        break;
+      case CardQuality.GOOD:
+        multiplier = 0.25;
+        break;
+      case CardQuality.GREAT:
+        multiplier = 0.5;
+        break;
+      case CardQuality.MINT:
+        multiplier = 1;
+        break;
+    }
+
+
+    return Math.ceil(15 / this.cardType.dropChanceMultiplier * multiplier);
   }
 
 }

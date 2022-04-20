@@ -12,6 +12,7 @@ import { MemberEntity } from "../common/member.entity";
 import { randomUUID } from "crypto";
 import * as superagent from "superagent";
 import { createCanvas, loadImage } from "canvas";
+import { CardRenderer } from "./card.renderer";
 
 @Injectable()
 export class CardgameGateway {
@@ -21,7 +22,8 @@ export class CardgameGateway {
     private client: Client,
     private guildService: GuildService,
     private memberService: MemberService,
-    private cardService: CardService
+    private cardService: CardService,
+    private cardRenderer: CardRenderer
   ) {
     setupCommands(client, guildService, this, {
       inventory: {
@@ -219,7 +221,7 @@ export class CardgameGateway {
 
     const files = [
       {
-        attachment: await this.getCardImage(drop),
+        attachment: await this.cardRenderer.renderCard(drop),
         name: "card.png"
       }
     ];
@@ -305,7 +307,7 @@ export class CardgameGateway {
     if (!card) {
       message.reply("Could not find card");
     } else {
-      const image = await this.getCardImage(card);
+      const image = await this.cardRenderer.renderCard(card)
 
 
       const embed = new MessageEmbed()
@@ -393,36 +395,6 @@ export class CardgameGateway {
     });
   }
 
-  async getCardImage(card: CardEntity): Promise<Buffer> {
-    const canvas = createCanvas(250, 350);
-    const ctx = canvas.getContext("2d");
-    const [overlay, avatar, star, starYellow] = await Promise.all([
-      loadImage("media/card_1.png"),
-      loadImage((await superagent.get(card.cardType.picture)).body as Buffer),
-      loadImage("media/star-solid.svg"),
-      loadImage("media/star-gold.svg")
 
-    ]);
-
-    const path = "tmp/" + randomUUID() + "png";
-    ctx.drawImage(avatar, 12, 12, 225, 225);
-    ctx.drawImage(overlay, 0, 0, 250, 350);
-
-    ctx.fillStyle = "black";
-    ctx.textBaseline = "top";
-    ctx.font = "regular 15pt Arial";
-    ctx.fillText(card.cardType.name, 12, 240);
-    let rating = 2;
-    for (let i = 0; i < 4; i++) {
-      if (i < rating) {
-        ctx.drawImage(starYellow, 168 + i * 20, 3, 18, 18);
-      } else {
-        ctx.drawImage(star, 168 + i * 20, 3, 18, 18);
-      }
-
-    }
-
-    return canvas.toBuffer("image/png");
-  }
 
 }
