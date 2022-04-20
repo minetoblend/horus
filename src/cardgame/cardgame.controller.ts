@@ -82,4 +82,16 @@ export class CardgameController {
     return await this.cardService.getRandomType();
   }
 
+  @Get("recalculate")
+  async recalculate() {
+    const mappers = await this.cardService.getAllCardTypes();
+    for (let mapper of mappers) {
+      mapper.calculateDropChanceMultiplier();
+      console.log(`Recalculated: ${mapper.name}`)
+      await this.cardService.updateCardType(mapper);
+    }
+
+    return "success";
+  }
+
 }

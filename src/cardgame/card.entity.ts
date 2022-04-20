@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryColumn, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryColumn } from "typeorm";
 import { CardTypeEntity } from "./cardtype.entity";
 import { MemberEntity } from "../common/member.entity";
 
@@ -41,11 +41,11 @@ export class CardEntity {
   quality: CardQuality;
 
   get rarityLevel() {
-    if (this.cardType.dropChanceMultiplier < 0.05)
+    if (this.cardType.dropChanceMultiplier < 0.1)
       return 4;
-    if (this.cardType.dropChanceMultiplier < 0.5)
+    if (this.cardType.dropChanceMultiplier < 0.4)
       return 3;
-    if (this.cardType.dropChanceMultiplier < 1)
+    if (this.cardType.dropChanceMultiplier < 1.05)
       return 2;
     return 1;
   }

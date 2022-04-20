@@ -9,9 +9,6 @@ import { CardService } from "./card.service";
 import { CardEntity, CardQuality } from "./card.entity";
 import { createPagination } from "../util/pagination";
 import { MemberEntity } from "../common/member.entity";
-import { randomUUID } from "crypto";
-import * as superagent from "superagent";
-import { createCanvas, loadImage } from "canvas";
 import { CardRenderer } from "./card.renderer";
 
 @Injectable()
@@ -180,11 +177,11 @@ export class CardgameGateway {
   }
 
 
-  async drop(message: Message) {
+  async drop(message: Message, [name]: string[]) {
 
     const member = await this.memberService.getOrCreateFromMember(message.member);
 
-    if (member.lastDropAt) {
+    if (member.lastDropAt && false) {
       const duration = Math.floor((new Date().getTime() - member.lastDropAt.getTime()) / 1000);
 
 
@@ -204,7 +201,7 @@ export class CardgameGateway {
     member.lastDropAt = new Date();
     this.memberService.update(member);
 
-    const drop = await this.cardService.createDrop(member);
+    const drop = await this.cardService.createDrop(member, name);
 
 
     const embed = new MessageEmbed()
@@ -307,7 +304,7 @@ export class CardgameGateway {
     if (!card) {
       message.reply("Could not find card");
     } else {
-      const image = await this.cardRenderer.renderCard(card)
+      const image = await this.cardRenderer.renderCard(card);
 
 
       const embed = new MessageEmbed()
@@ -388,13 +385,11 @@ export class CardgameGateway {
           .join("\n")
       );
 
-    const actionRow = new MessageActionRow();
 
     await message.reply({
       embeds: [embed]
     });
   }
-
 
 
 }

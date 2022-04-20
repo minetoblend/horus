@@ -28,7 +28,7 @@ export class CardRenderer {
     ctx.font = "regular 12pt Arial";
     ctx.fillText(`Ranked maps: ${card.cardType.numRankedMaps}`, 12, 270);
     ctx.fillText(`Subscribers: ${card.cardType.numMappingSubscribers}`, 12, 290);
-    ctx.fillText(`Favorites: ${card.cardType.numFavorites}`, 12, 310);
+    //ctx.fillText(`Multiplier: ${card.cardType.dropChanceMultiplier}`, 12, 310);
 
     let rating = card.rarityLevel;
     for (let i = 0; i < 4; i++) {

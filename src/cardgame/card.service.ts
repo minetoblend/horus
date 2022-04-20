@@ -23,18 +23,11 @@ export class CardService {
 
   getRandomType() {
 
-    const sql = this.cardTypeRepository.createQueryBuilder()
-      .select()
-      .orderBy("random() * dropChanceMultiplier")
-      .limit(1)
-      .getSql();
-
-    console.log(sql);
 
     return this.cardTypeRepository
       .createQueryBuilder()
       .select()
-      .orderBy("random() * dropChanceMultiplier")
+      .orderBy("random()")
       .limit(1)
       .printSql()
       .getOne();
@@ -62,8 +55,14 @@ export class CardService {
     return result;
   }
 
-  async createDrop(member: MemberEntity) {
-    const type = await this.getRandomType();
+  async createDrop(member: MemberEntity, name?: string) {
+    let type = await this.getRandomType();
+    if(name) {
+      let newType = await this.cardTypeRepository.findOneBy({name})
+      if(newType)
+        type = newType
+    }
+
     const drop = new CardEntity();
     drop.id = await this.generateCardId();
     drop.cardType = type;
@@ -109,5 +108,9 @@ export class CardService {
       skip,
       take
     });
+  }
+
+  async getAllCardTypes() {
+    return this.cardTypeRepository.find();
   }
 }
