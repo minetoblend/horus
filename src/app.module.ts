@@ -8,6 +8,7 @@ import { CommonModule } from "./common/common.module";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CardgameModule } from "./cardgame/cardgame.module";
 import { ConfigModule as GuildConfigModule } from "./config/config.module";
+import { CommerceModule } from "./commerce/commerce.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ConfigModule as GuildConfigModule } from "./config/config.module";
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         token: configService.get("DISCORD_TOKEN"),
+        prefix: "k",
         discordClientOptions: {
           intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]
         }
@@ -31,7 +33,8 @@ import { ConfigModule as GuildConfigModule } from "./config/config.module";
     CommonModule,
     CardgameModule,
     ConfigModule,
-    GuildConfigModule
+    GuildConfigModule,
+    CommerceModule
   ],
   controllers: [AppController],
   providers: [AppService]

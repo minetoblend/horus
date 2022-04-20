@@ -17,18 +17,22 @@ export class MemberService {
   }
 
   locked(fn: (() => Promise<any>)) {
-    lock.acquire("member", (done) => {
-      fn().finally(done());
+    return lock.acquire("member", (done) => {
+      fn().finally(() => done());
     });
   }
 
   async getOrCreateFromMember(member: GuildMember | User): Promise<MemberEntity> {
-    let entity = await this.repository.findOneBy({ id: member.id });
-    if (!entity) {
-      entity = new MemberEntity();
-      entity.id = member.id;
-      await this.update(entity);
-    }
+    let entity;
+    await this.locked(async () => {
+      entity = await this.repository.findOneBy({ id: member.id });
+      if (!entity) {
+        entity = new MemberEntity();
+        entity.id = member.id;
+        await this.update(entity);
+      }
+    });
+
     return entity;
   }
 
@@ -44,5 +48,6 @@ export class MemberService {
       entity.id = id;
       await this.update(entity);
     }
-    return entity;  }
+    return entity;
+  }
 }

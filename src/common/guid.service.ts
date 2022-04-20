@@ -21,7 +21,7 @@ export class GuildService {
   async getOrCreateFromGuild(guild: Guild): Promise<GuildEntity> {
     let entity;
 
-    await lock.acquire("member", async (done) => {
+    await lock.acquire("guild", async (done) => {
       entity = await this.guildRepository.findOneBy({ id: guild.id });
       if (!entity) {
         entity = new GuildEntity();
@@ -39,4 +39,7 @@ export class GuildService {
     return this.guildRepository.save(guild);
   }
 
+  getFromGuild(guild: Guild) {
+    return this.guildRepository.findOneBy({ id: guild.id });
+  }
 }

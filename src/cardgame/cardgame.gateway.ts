@@ -10,6 +10,9 @@ import { CardEntity, CardQuality } from "./card.entity";
 import { createPagination } from "../util/pagination";
 import { MemberEntity } from "../common/member.entity";
 import { CardRenderer } from "./card.renderer";
+import * as superagent from "superagent";
+import { ConfigService } from "@nestjs/config";
+import { CardTypeEntity } from "./cardtype.entity";
 
 @Injectable()
 export class CardgameGateway {
@@ -20,9 +23,10 @@ export class CardgameGateway {
     private guildService: GuildService,
     private memberService: MemberService,
     private cardService: CardService,
-    private cardRenderer: CardRenderer
+    private cardRenderer: CardRenderer,
+    private configService: ConfigService
   ) {
-    setupCommands(client, guildService, this, {
+    /*setupCommands(client, guildService, this, {
       inventory: {
         locked: true,
         handler: "showInventory"
@@ -59,9 +63,17 @@ export class CardgameGateway {
       burn: {
         locked: true,
         handler: "burn"
+      },
+      addMapper: {
+        handler: "addMapper",
+        locked: true
       }
-    });
+    });*/
   }
+
+
+
+
 
 
   async showInventory(message: Message) {
@@ -199,7 +211,7 @@ export class CardgameGateway {
     }
 
     member.lastDropAt = new Date();
-    this.memberService.update(member);
+    await this.memberService.update(member);
 
     const drop = await this.cardService.createDrop(member, name);
 
@@ -376,6 +388,7 @@ export class CardgameGateway {
     const embed = new MessageEmbed()
       .setTitle("Burn Card")
       .setThumbnail(card.cardType.picture)
+      .setColor("RED")
       .setDescription(
         [
           `${message.member.toString()} you will receive:`,
@@ -385,11 +398,85 @@ export class CardgameGateway {
           .join("\n")
       );
 
+    const actionRow = new MessageActionRow();
+    actionRow.addComponents(
+      new MessageButton()
+        .setStyle("SECONDARY")
+        .setEmoji("✅")
+        .setCustomId("ok"),
+      new MessageButton()
+        .setStyle("SECONDARY")
+        .setEmoji("❌")
+        .setCustomId("cancel")
+    );
 
-    await message.reply({
-      embeds: [embed]
+    const reply = await message.reply({
+      embeds: [embed],
+      components: [actionRow]
+    });
+
+    const collector = reply.createMessageComponentCollector({ time: 15_000 });
+    collector.on("collect", async interaction => {
+      if (interaction.user.id !== message.member.id)
+        return;
+      let text = "";
+      await interaction.deferUpdate();
+      if (interaction.customId === "ok") {
+        let member = await this.memberService.getOrCreateFromMember(message.member);
+        card.burnedAt = new Date();
+        card.owner.gold += card.cardBurnValue;
+        this.memberService.update(member);
+        text = "Card has been burned";
+      } else {
+        text = "Burn has been canceled";
+      }
+      collector.dispose(interaction);
+      embed.setColor("DEFAULT");
+      await reply.edit({
+        content: text,
+        embeds: [embed]
+      });
+    });
+    collector.on("end", () => {
+      embed.setColor("DEFAULT");
+      reply.edit({
+        embeds: [embed]
+      });
     });
   }
 
+  async addMapper(message: Message, [name]: string) {
+    const response = await superagent.get(`https://osu.ppy.sh/api/v2/users/${name}`)
+      .set("Authorization", `Bearer ${this.configService.get("OSU_ACCESS_TOKEN")}`);
+    const profile = response.body;
+
+    const cardType = new CardTypeEntity();
+    cardType.type = "mapper";
+    cardType.picture = profile.avatar_url;
+    cardType.country = profile.country_url;
+    cardType.name = profile.username;
+    cardType.previousUsernames = (profile.previous_usernames || []).join(", ");
+    cardType.profileId = profile.id;
+    cardType.numRankedMaps = profile.ranked_beatmapset_count;
+    cardType.numMappingSubscribers = profile.mapping_follower_count;
+    cardType.followerCount = profile.follower_count;
+    cardType.numFavorites = 0;
+    cardType.calculateDropChanceMultiplier();
+
+    await this.cardService.updateCardType(cardType);
+
+    await message.reply(`Added card for ${cardType.name}`);
+  }
+
+  lookup(message: Message, [name]: string[]) {
+    let cardType;
+    if (!isNaN(parseInt(name))) {
+      let cardType = this.cardService.getCardTypeByProfileId(name);
+    } else {
+      let cardType = this.cardService.getCardTypeByName(name);
+    }
+  }
 
 }
+
+``;

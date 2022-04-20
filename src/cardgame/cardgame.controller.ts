@@ -45,10 +45,14 @@ export class CardgameController {
         return;
       }
 
+
       try {
         const response = await superagent.get(`https://osu.ppy.sh/api/v2/users/${mapper.mapperId}`)
           .set("Authorization", `Bearer ${this.configService.get("OSU_ACCESS_TOKEN")}`);
         const profile = response.body;
+
+        if (profile.playmode !== "osu")
+          return;
 
         const numFavorites = Math.round(mapper.count);
 
@@ -87,7 +91,6 @@ export class CardgameController {
     const mappers = await this.cardService.getAllCardTypes();
     for (let mapper of mappers) {
       mapper.calculateDropChanceMultiplier();
-      console.log(`Recalculated: ${mapper.name}`)
       await this.cardService.updateCardType(mapper);
     }
 

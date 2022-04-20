@@ -57,10 +57,10 @@ export class CardService {
 
   async createDrop(member: MemberEntity, name?: string) {
     let type = await this.getRandomType();
-    if(name) {
-      let newType = await this.cardTypeRepository.findOneBy({name})
-      if(newType)
-        type = newType
+    if (name) {
+      let newType = await this.cardTypeRepository.findOneBy({ name });
+      if (newType)
+        type = newType;
     }
 
     const drop = new CardEntity();
@@ -77,6 +77,13 @@ export class CardService {
     return this.cardRepository.findOneBy({ id });
   }
 
+  getCardTypeByProfileId(profileId: string) {
+    return this.cardTypeRepository.findOneBy({ profileId });
+  }
+
+  getCardTypeByName(name: string) {
+    return this.cardTypeRepository.findOneBy({ name });
+  }
 
   async claim(member: MemberEntity, drop: CardEntity) {
     drop.owner = member;
@@ -87,7 +94,7 @@ export class CardService {
 
   async getLatestCard(member: MemberEntity) {
     return this.cardRepository.findOne({
-      where: { owner: member, ownedAt: Not(IsNull()) },
+      where: { owner: member, ownedAt: Not(IsNull()), burnedAt: IsNull() },
       order: {
         ownedAt: "desc"
       }
@@ -112,5 +119,10 @@ export class CardService {
 
   async getAllCardTypes() {
     return this.cardTypeRepository.find();
+  }
+
+  async burnCard(card: CardEntity) {
+    card.burnedAt = new Date();
+    await this.cardRepository.save(card);
   }
 }
