@@ -47,7 +47,9 @@ export class DropCommand {
       member.lastDropAt = new Date();
       await this.memberService.update(member);
 
-      const card = await this.cardService.createDrop(member);
+      const [_, name] = message.content.trim().split(' ');
+
+      const card = await this.cardService.createDrop(member, name);
 
       const embed = new MessageEmbed()
         .setImage("attachment://card.png")
